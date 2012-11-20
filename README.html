@@ -1,0 +1,156 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<title>HiveKVStorageHandler</title>
+</head>
+
+<body>
+
+<h3>About HiveKVStorageHandler:</h3>
+<p>This is an implementation of a Storage Handler to query data stored in Oracle NoSQL Database via Hive.</p>
+<p>Written by: Alexandre Vilcek (alexandre.vilcek@oracle.com)</p>
+<br /><hr />
+
+<h3>If you want to know what a Hive Storage Handler is:</h3>
+<p><a href="https://cwiki.apache.org/Hive/storagehandlers.html">Hive Storage Handler</a></p>
+<br /><hr />
+
+<h3>Current Limitations:</h3>
+<ul>
+<li>Supports only external non-native Hive tables.</li>
+<li>Writing data to Oracle NoSQLDB is not supported yet.</li>
+<li>Parsing of Hive SerDe properties is very rudimentary yet and spaces between NoSQL DB keys definitions in the key mappings properties in the Hive table create statement will cause key names to be misinterpreted.</li>
+<li>Columns names and types specified in the Hive table definition are ignored; only NoSQL DB Major and Minor Keys mappings in the Hive table create statement define the column names.</li>
+<li>A NoSQL DB Value for a given key is always interpred as string in the Hive table.</li>
+</ul>
+<br /><hr />
+
+<h3>Hive CREATE TABLE Syntax:</h3>
+<div><code>CREATE EXTERNAL TABLE &lt;hive_table_name&gt; (column_name column_type,column_name column type, ...)</code></div>
+<div><code>STORED BY 'org.vilcek.hive.kv.KVHiveStorageHandler'</code></div>
+<div><code>WITH SERDEPROPERTIES ("kv.major.keys.mapping" = "&lt;majorKey1,majorKey2,...&gt;", "kv.minor.keys.mapping" = "&lt;minorKey1,minorKey2,...&gt;")</code></div>
+<div><code>TBLPROPERTIES ("kv.host.port" = "&lt;kvstore hostname&gt;:&lt;kvstore port number&gt;", "kv.name" = "&lt;kvstore name&gt;");</code></div>
+<br /><hr />
+
+<h3>Example:</h3>
+<p>Data stored in Oracle NoSQL Database:</p>
+<div><code>/Smith/Bob/-/birthdate: 05/02/1975</code></div>
+<div><code>/Smith/Bob/-/phonenumber: 1111-1111</code></div>
+<div><code>/Smith/Bob/-/userid: 1</code></div>
+<div><code>/Smith/Patricia/-/birthdate: 10/25/1967</code></div>
+<div><code>/Smith/Patricia/-/phonenumber: 2222-2222</code></div>
+<div><code>/Smith/Patricia/-/userid: 2</code></div>
+<div><code>/Wong/Bill/-/birthdate: 03/10/1982</code></div>
+<div><code>/Wong/Bill/-/phonenumber: 3333-3333</code></div>
+<div><code>/Wong/Bill/-/userid: 3</code></div>
+
+<p>Table definition and query in Hive:</p>
+<p><code>hive> ADD JAR HiveKVStorageHandler.jar;</code></p>
+<div><code>hive> CREATE EXTERNAL TABLE nosqldbtest (lastname string, firstname string, birthdate string, phonenumber string, userid string)</code></div>
+<div><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; STORED BY 'org.vilcek.hive.kv.KVHiveStorageHandler'</code></div>
+<div><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; WITH SERDEPROPERTIES ("kv.major.keys.mapping" = "lastname,firstname", "kv.minor.keys.mapping" = "birthdate,phonenumber,userID")</code></div>
+<div><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TBLPROPERTIES ("kv.host.port" = "localhost:5000", "kv.name" = "kvstore");</code></div>
+
+<p><code>hive> SELECT * FROM nosqldbtest;</code></p>
+<table border="0">
+<tr>
+<td><code>OK</code></td>
+</tr>
+<tr>
+<td><code>Smith&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>Patricia&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>10/25/1967&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></code>
+<td><code>NULL</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Smith</td></code>
+<td><code>Patricia</td></code>
+<td><code>NULL</td></code>
+<td><code>2222-2222&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Smith</td></code>
+<td><code>Patricia</td></code>
+<td><code>NULL</td</code>
+<td><code>NULL</td></code>
+<td><code>2</td></code>
+</tr>
+<tr>
+<td><code>Smith</td></code>
+<td><code>Bob</td></code>
+<td><code>05/02/1975</td></code>
+<td><code>NULL</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Smith</td></code>
+<td><code>Bob</td></code>
+<td><code>NULL</td></code>
+<td><code>1111-1111</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Smith</td></code>
+<td><code>Bob</td></code>
+<td><code>NULL</td></code>
+<td><code>NULL</td></code>
+<td><code>1</td></code>
+</tr>
+<tr>
+<td><code>Wong</td></code>
+<td><code>Bill</td></code>
+<td><code>03/10/1982</td></code>
+<td><code>NULL</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Wong</td></code>
+<td><code>Bill</td></code>
+<td><code>NULL</td></code>
+<td><code>3333-3333</td></code>
+<td><code>NULL</td></code>
+</tr>
+<tr>
+<td><code>Wong</td></code>
+<td><code>Bill</td></code>
+<td><code>NULL</td></code>
+<td><code>NULL</td></code>
+<td><code>3</td></code>
+</tr>
+</table>
+
+<p />
+<div><code>hive> SELECT lastname, firstname, collect_set(birthdate)[0], collect_set(phonenumber)[0], collect_set(userid)[0]</code></div>
+<div><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FROM nosqldbtest</code></div>
+<div><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GROUP BY lastname, firstname;</code></div>
+<p><table border="0">
+<tr>
+<td><code>OK</code></td>
+</tr>
+<tr>
+<td><code>Smith&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>Bob&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>05/02/1975&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>1111-1111&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></code>
+<td><code>1</td></code>
+</tr>
+<tr>
+<td><code>Smith</code></td>
+<td><code>Patricia&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code></td>
+<td><code>10/25/1967</code></td>
+<td><code>2222-2222</td></code>
+<td><code>2</td></code>
+</tr>
+<tr>
+<td><code>Wong</code></td>
+<td><code>Bill</code></td>
+<td><code>03/10/1982</code></td>
+<td><code>3333-3333</td></code>
+<td><code>3</td></code>
+</tr>
+</p>
+
+</body>
+</html>
